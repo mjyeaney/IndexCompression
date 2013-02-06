@@ -31,3 +31,4 @@ cleaning that up.
 * This project is only for exploring query performance on compressed data lists; persistence is not handled at all, nor is
 this attempting to be a complete data store (working on another project for that).
 * Would like to add and compare to P4Delta encoding
+* Other tests for Huffman string encoding would also be valuable.
