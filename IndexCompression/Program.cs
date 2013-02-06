@@ -17,7 +17,7 @@ static class Program
     {
         // Test config
         var TERMS = 10000;
-        var DOCS_PER_TERM = 5000;
+        var DOCS_PER_TERM = 1000;
         var TOTAL_DOCS = 10000;
 
         // test support
@@ -101,7 +101,7 @@ static class Program
 
         ////////////////////////////////////////////////////////
         //
-        // Search index data
+        // Results summary
         //
 
         sw.Stop();
