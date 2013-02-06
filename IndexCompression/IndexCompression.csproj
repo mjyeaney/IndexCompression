@@ -36,14 +36,21 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject>TestCases</StartupObject>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Base128Encoding.cs" />
-    <Compile Include="Program.cs" />
+    <Compile Include="Assert.cs" />
+    <Compile Include="Base128Encoder.cs" />
+    <Compile Include="DocPositionPair.cs" />
+    <Compile Include="Fnv32aHash.cs" />
+    <Compile Include="TermValuePair.cs" />
+    <Compile Include="TestCases.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

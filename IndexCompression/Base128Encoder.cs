@@ -5,7 +5,7 @@ using System.IO;
 /// <summary>
 /// Performse Base-128 Varint encoding on a singe or list or uint's.
 /// </summary>
-public class Base128Encoding
+public class Base128Encoder
 {
     /// <summary>
     /// Encodes a list of uint data.

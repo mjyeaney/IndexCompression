@@ -26,7 +26,7 @@ time is fairly stable. This means the logic is holding up, or doesn't work at al
 
 ### Known Issues
 
-* Not sure the encoder is correctly returning d-gap lists correctly yet...this code is still being flushed out and un-tested. Working on
+* Not sure the encoder is correctly returning d-gap lists correctly yet...this code is still being flushed out and unit-tested. Working on
 cleaning that up.
 * This project is only for exploring query performance on compressed data lists; persistence is not handled at all, nor is
 this attempting to be a complete data store (working on another project for that).
