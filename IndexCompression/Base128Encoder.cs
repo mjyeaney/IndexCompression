@@ -13,18 +13,19 @@ public class Base128Encoder
     /// <param name="stream">Output stream used to capture encoded bytes.</param>
     /// <param name="data">The data to encode.</param>
     /// <returns>Length of the encoded data stream.</returns>
-    public int EncodeList(Stream stream, List<uint> data)
+    public byte[] EncodeList(List<uint> data)
     {
-        if (data.Count == 0) return 0;
+        if (data.Count == 0) return new byte[0];
 
-        data = createDGapList(data);
-
-        int len = -1;
-        for (int i = 0; i < data.Count; i++)
+        using (var encodingStream = new MemoryStream())
         {
-            len += Encode(stream, data[i]);
+            data = createDGapList(data);
+            for (int i = 0; i < data.Count; i++)
+            {
+                Encode(encodingStream, data[i]);
+            }
+            return encodingStream.ToArray();
         }
-        return len;
     }
 
     /// <summary>
@@ -32,17 +33,20 @@ public class Base128Encoder
     /// </summary>
     /// <param name="stream">Stream containing encoded data bytes.</param>
     /// <returns>Decoded data set.</returns>
-    public List<uint> DecodeList(Stream stream)
+    public List<uint> DecodeList(byte[] compressedData)
     {
-        var list = new List<uint>();
-        uint value, last = 0;
-        while (TryDecode(stream, out value))
+        using (var decodeStream = new MemoryStream(compressedData))
         {
-            // we encoded a d-gap list, so keep adding to get orig data
-            last += value;
-            list.Add(last);
+            var list = new List<uint>();
+            uint value, last = 0;
+            while (TryDecode(decodeStream, out value))
+            {
+                // we encoded a d-gap list, so keep adding to get orig data
+                last += value;
+                list.Add(last);
+            }
+            return list;
         }
-        return list;
     }
 
     /// <summary>

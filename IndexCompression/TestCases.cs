@@ -1,10 +1,9 @@
-﻿using System;
+﻿using IndexCompression;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using IndexCompression;
 
 static class TestCases
 {
@@ -45,7 +44,7 @@ static class TestCases
         runTest("VerifyEncodeDecodeList", ListEncodesAndDecodes);
         runTest("CanLocateKnownData", CanLocateKnownData);
         runTest("CanStoreMultiValueData", CanStoreMultiValueData);
-        runTest("LoadTestScenario", LoadTestScenario);
+        //runTest("LoadTestScenario", LoadTestScenario);
     }
 
     /// <summary>
@@ -53,30 +52,24 @@ static class TestCases
     /// </summary>
     static void ListEncodesAndDecodes()
     {
-        var list1 = new List<uint>();
+        var rawList = new List<uint>();
 
         for (var j = 0; j < 10; j++)
         {
-            list1.Add((uint)j);
+            rawList.Add((uint)j);
         }
 
         var encoder = new Base128Encoder();
-        using (var encStream = new MemoryStream())
+        var decodedList = encoder.DecodeList(encoder.EncodeList(rawList));
+
+        rawList.Sort();
+        decodedList.Sort();
+
+        Assert.AreEqual(rawList.Count, decodedList.Count);
+
+        for (var m = 0; m < rawList.Count; m++)
         {
-            encoder.EncodeList(encStream, list1);
-            encStream.Position = 0;
-
-            var list2 = encoder.DecodeList(encStream);
-
-            list1.Sort();
-            list2.Sort();
-
-            Assert.AreEqual(list1.Count, list2.Count);
-
-            for (var m = 0; m < list1.Count; m++)
-            {
-                Assert.AreEqual(list1[m], list2[m]);
-            }
+            Assert.AreEqual(rawList[m], decodedList[m]);
         }
     }
 
@@ -90,37 +83,27 @@ static class TestCases
 
         // The term "cat" matches documents 2,4,6,8
         var docsWithCat = new List<uint>() { 2, 4, 6, 8 };
-        using (var encoderStream = new MemoryStream())
-        {
-            encoder.EncodeList(encoderStream, docsWithCat);
-            index["cat"] = encoderStream.ToArray();
-        }
+        index["cat"] = encoder.EncodeList(docsWithCat);
 
         // The term "dog" matches documents 6,8,10,12
         var docsWithDog = new List<uint>() { 6, 8, 10, 12 };
-        using (var encoderStream = new MemoryStream())
-        {
-            encoder.EncodeList(encoderStream, docsWithDog);
-            index["dog"] = encoderStream.ToArray();
-        }
+        index["dog"] = encoder.EncodeList(docsWithDog);
 
-        // query for docs that have both
+        // query for docs that have both "cat" and "dog"
         var results = new HashSet<uint>();
         var firstPass = true;
+
         foreach (var pair in index)
         {
-            using (var decodeStream = new MemoryStream(pair.Value))
+            var idList = encoder.DecodeList(pair.Value);
+            if (firstPass)
             {
-                var idList = encoder.DecodeList(decodeStream);
-                if (firstPass)
-                {
-                    firstPass = false;
-                    results.UnionWith(idList);
-                }
-                else
-                {
-                    results.IntersectWith(idList);
-                }
+                firstPass = false;
+                results.UnionWith(idList);
+            }
+            else
+            {
+                results.IntersectWith(idList);
             }
         }
 
@@ -132,25 +115,30 @@ static class TestCases
 
     /// <summary>
     /// Make sure we can save multidimensional data, using indirection
-    /// on the doc-ids.
+    /// on both the doc-ids _and_ terms.
     /// 
     /// Lets save a table like so:
     /// 
-    ///     "col0"  "col1"  "col2"  "col3" "col4"   "col5"
-    /// d0   NULL      b       c       d      e        f
-    /// d0    gg      NULL     i       j      k        zz
-    /// d0    m        n      NULL     p      q        r
-    /// d1    s        t       u      NULL    w        x
-    /// d1    y        z       0       1     NULL      zz
-    /// d1    4        5       6       7      8       NULL
+    ///     "author"    "years_experience"
+    /// d0   "Bob"          5
+    /// d0   "Bill"         3
+    /// d0   "Nancy"        9
+    /// 
+    /// d1   "Tom"          2
+    /// d1   "Derrick"      4
+    /// d1   "Billy"        6
     /// 
     /// We should then be able to query for a column and get only those 
     /// values back that belong to a specific document. So our query case 
     /// could then be something like the following:
     /// 
-    ///     "All documents that have 'gg' for 'col0' and 'zz' for 'col5'."
+    ///     "For all documents that have 'Bill' as an author, compute total combined
+    ///     years of experience".
     ///     
-    /// Based on the above dataset, this should yield only 'd0'.
+    /// Based on the above dataset, this should yield:
+    /// 
+    ///     d0 : 17
+    ///     
     /// </summary>
     static void CanStoreMultiValueData()
     {
@@ -160,83 +148,109 @@ static class TestCases
         var index = new Dictionary<uint, byte[]>();
         var encoder = new Base128Encoder();
 
-        // Add table data, one column at a time encoded off of the above matrix
-        addIndexValue("col0", "g", 0, 1, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col0", "m", 0, 2, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col0", "s", 1, 3, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col0", "y", 1, 4, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col0", "4", 1, 5, termHashMap, docHashMap, index, encoder);
+        // Add data for doc 0 (d0)
+        addIndexValue("author", "Bob", 0, 0, termHashMap, docHashMap, index, encoder);
+        addIndexValue("author", "Bill", 0, 1, termHashMap, docHashMap, index, encoder);
+        addIndexValue("author", "Nancy", 0, 2, termHashMap, docHashMap, index, encoder);
+        addIndexValue("years_experience", "5", 0, 0, termHashMap, docHashMap, index, encoder);
+        addIndexValue("years_experience", "3", 0, 1, termHashMap, docHashMap, index, encoder);
+        addIndexValue("years_experience", "9", 0, 2, termHashMap, docHashMap, index, encoder);
 
-        addIndexValue("col1", "b", 1, 0, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col1", "n", 1, 2, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col1", "t", 1, 3, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col1", "z", 1, 4, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col1", "5", 1, 5, termHashMap, docHashMap, index, encoder);
+        // Add data for doc 1 (d1)
+        addIndexValue("author", "Tom", 1, 0, termHashMap, docHashMap, index, encoder);
+        addIndexValue("author", "Derrick", 1, 1, termHashMap, docHashMap, index, encoder);
+        addIndexValue("author", "Billy", 1, 2, termHashMap, docHashMap, index, encoder);
+        addIndexValue("years_experience", "2", 1, 0, termHashMap, docHashMap, index, encoder);
+        addIndexValue("years_experience", "4", 1, 1, termHashMap, docHashMap, index, encoder);
+        addIndexValue("years_experience", "6", 1, 2, termHashMap, docHashMap, index, encoder);
 
-        addIndexValue("col2", "c", 1, 0, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col2", "i", 1, 1, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col2", "u", 1, 3, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col2", "0", 1, 4, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col2", "6", 1, 5, termHashMap, docHashMap, index, encoder);
+        // Our query case:
+        //     "For all documents that have 'Bill' as an author, compute total combined
+        //     years of experience".
+        //
 
-        addIndexValue("col3", "d", 1, 0, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col3", "j", 1, 1, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col3", "p", 1, 2, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col3", "1", 1, 4, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col3", "7", 1, 5, termHashMap, docHashMap, index, encoder);
-
-        addIndexValue("col4", "e", 1, 0, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col4", "k", 1, 1, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col4", "q", 1, 2, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col4", "w", 1, 3, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col4", "8", 1, 5, termHashMap, docHashMap, index, encoder);
-
-        addIndexValue("col5", "f", 1, 0, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col5", "l", 1, 1, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col5", "r", 1, 2, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col5", "x", 1, 3, termHashMap, docHashMap, index, encoder);
-        addIndexValue("col5", "3", 1, 4, termHashMap, docHashMap, index, encoder);
-
-        // query for a specifc column, say "col3"
-        var results = new List<DocPositionPair>();
-        var col3Hashes = new HashSet<uint>(termHashMap
-            .Where(k => k.Value.Archetype == "col3")
+        // NOTE: These lookups are scans only to find the values of interest. If this
+        // were coming from an actual UI, the user would have done this, and therefore 
+        // these lookups would be skipped. This works because we associate a hash value 
+        // with a term name _and_ value...each one is unique (collisions aside)
+        
+        // isloate terms of type "author" with value "Bill"
+        var authorHashes = new HashSet<uint>(termHashMap
+            .Where(k => k.Value.TermName == "author" && k.Value.Value == "Bill")
             .Select(u => u.Key));
 
-        // walk index entires
-        foreach (var pair in index)
-        {
-            // see if this entry is from our target population
-            if (col3Hashes.Contains(pair.Key))
-            {
-                //// decode the hashes back to the original doc+position data
-                //using (var decodeStream = new MemoryStream(pair.Value))
-                //{
-                //    var decodedList = encoder.DecodeList(decodeStream);
+        // isolate "years_experience" values
+        var yearsExperienceHashes = new HashSet<uint>(termHashMap
+            .Where(k => k.Value.TermName == "years_experience")
+            .Select(u => u.Key));
 
-                //    foreach (var docHash in decodedList)
-                //    {
-                //        results.Add(docHashMap[docHash]);
-                //    }
-                //}
+        var docsThatHaveAuthor = new HashSet<uint>();
+        var result = 0;
+
+        // Find the docs ID's that have the specified author
+        foreach (var hash in authorHashes)
+        {
+            foreach (var docHash in encoder.DecodeList(index[hash]))
+            {
+                docsThatHaveAuthor.Add(docHashMap[docHash].Identifier);
+            }
+        }
+
+        // Find all years_experience values belonging to the found doc ID's
+        foreach (var hash in yearsExperienceHashes)
+        {
+            foreach (var docHash in encoder.DecodeList(index[hash]))
+            {
+                // Hashset.contains is ~ O(1)
+                if (docsThatHaveAuthor.Contains(docHashMap[docHash].Identifier))
+                {
+                    result += Convert.ToInt32(termHashMap[hash].Value);
+                }
             }
         }
 
         // Check results
+        Assert.AreEqual(17, result);
     }
 
     /// <summary>
     /// Helper method to add index entries
     /// </summary>
-    static void addIndexValue(string termArchetype, 
+    static void addIndexValue(string termName, 
         string termValue, 
-        int docId, 
-        int position, 
+        uint docId, 
+        uint position, 
         Dictionary<uint, TermValuePair> termHashMap, 
         Dictionary<uint, DocPositionPair> docHashMap, 
-        Dictionary<uint, byte[]> index, Base128Encoder encoder)
+        Dictionary<uint, byte[]> index, 
+        Base128Encoder encoder)
     {
-        //
+        var termPair = new TermValuePair(termName, termValue);
+        var termPairHash = termPair.ComputeHashValue();
+
+        if (!termHashMap.ContainsKey(termPairHash))
+        {
+            termHashMap[termPairHash] = termPair;
+        }
+
+        var docPair = new DocPositionPair(docId, position);
+        var docPairHash = docPair.ComputeHashValue();
+
+        if (!docHashMap.ContainsKey(docPairHash))
+        {
+            docHashMap[docPairHash] = docPair;
+        }
+
+        if (!index.ContainsKey(termPairHash))
+        {
+            index[termPairHash] = encoder.EncodeList(new List<uint>() { docPairHash });
+        }
+        else
+        {
+            var currentList = encoder.DecodeList(index[termPairHash]);
+            currentList.Add(docPairHash);
+            index[termPairHash] = encoder.EncodeList(currentList);
+        }
     }
 
     /// <summary>
@@ -274,13 +288,8 @@ static class TestCases
             }
 
             // compress the docID list
-            using (var encodingStream = new MemoryStream())
-            {
-                encoder.EncodeList(encodingStream, docLinks);
-
-                // We'll just use 'j' in string form as our term
-                index[j.ToString()] = encodingStream.ToArray();
-            }
+            // We'll just use 'j' in string form as our term
+            index[j.ToString()] = encoder.EncodeList(docLinks);
         }
 
         ////////////////////////////////////////////////////////
@@ -300,21 +309,18 @@ static class TestCases
         {
             if (query(termPair.Key))
             {
-                using (var decodeStream = new MemoryStream(termPair.Value))
-                {
-                    // decode
-                    var decodedList = encoder.DecodeList(decodeStream);
+                // decode
+                var decodedList = encoder.DecodeList(termPair.Value);
 
-                    // can't intersect with an empty set - always result in nullset.
-                    if (firstPass)
-                    {
-                        firstPass = false;
-                        outSet.UnionWith(decodedList);
-                    }
-                    else
-                    {
-                        outSet.IntersectWith(decodedList);
-                    }
+                // can't intersect with an empty set - always result in nullset.
+                if (firstPass)
+                {
+                    firstPass = false;
+                    outSet.UnionWith(decodedList);
+                }
+                else
+                {
+                    outSet.IntersectWith(decodedList);
                 }
             }
         }
@@ -325,6 +331,6 @@ static class TestCases
         //
 
         sw.Stop();
-        Console.WriteLine("\t\tQuery finished: {0}ms", sw.ElapsedMilliseconds);
+        //Console.WriteLine("\t\tQuery finished: {0}ms", sw.ElapsedMilliseconds);
     }
 }

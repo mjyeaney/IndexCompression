@@ -28,7 +28,7 @@ namespace IndexCompression
         /// <summary>
         /// Returns the index hash value for this instance.
         /// </summary>
-        public uint GetIndexHashValue()
+        public uint ComputeHashValue()
         {
             var txtToHash = string.Format("doc_{0}_pos_{1}", Identifier, Position);
             return FNV32BitHash.ComputeHash(txtToHash);

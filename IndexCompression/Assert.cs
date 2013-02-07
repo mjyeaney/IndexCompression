@@ -3,7 +3,8 @@
 namespace IndexCompression
 {
     /// <summary>
-    /// Some basic testing support.
+    /// Some basic testing support - replace with your favorite 
+    /// testing FX.
     /// </summary>
     public static class Assert
     {
@@ -14,7 +15,7 @@ namespace IndexCompression
         {
             if (!expr())
             {
-                throw new Exception("Statement not true.");
+                throw new Exception("Expression evaluated as false.");
             }
         }
 
@@ -25,7 +26,7 @@ namespace IndexCompression
         {
             if (expr())
             {
-                throw new Exception("Statement not false.");
+                throw new Exception("Expression evaluated as true.");
             }
         }
 
@@ -36,7 +37,7 @@ namespace IndexCompression
         {
             if (!first.Equals(second))
             {
-                throw new Exception("Arguments not equal.");
+                throw new Exception(String.Format("Arguments not equal; {0} <> {1}", first, second));
             }
         }
 
@@ -47,7 +48,7 @@ namespace IndexCompression
         {
             if (first.Equals(second))
             {
-                throw new Exception("Arguments are equal.");
+                throw new Exception(String.Format("Arguments are equal; {0} == {1}", first, second));
             }
         }
     }

@@ -8,9 +8,9 @@
         /// <summary>
         /// Creates a new TermValuePair instance.
         /// </summary>
-        public TermValuePair(string archetype, string value)
+        public TermValuePair(string termName, string value)
         {
-            Archetype = archetype;
+            TermName = termName;
             Value = value;
         }
 
@@ -18,7 +18,7 @@
         /// The 'archetype' of this term; a sort of higher-level
         /// categorization of terms.
         /// </summary>
-        public string Archetype { get; set; }
+        public string TermName { get; set; }
 
         /// <summary>
         /// The actual term value.
@@ -28,9 +28,9 @@
         /// <summary>
         /// Returns the index hash value for this instance.
         /// </summary>
-        public uint GetIndexHashValue()
+        public uint ComputeHashValue()
         {
-            var txtToHash = string.Format("arch_{0}_value_{1}", Archetype, Value);
+            var txtToHash = string.Format("term_{0}_value_{1}", TermName, Value);
             return FNV32BitHash.ComputeHash(txtToHash);
         }
     }
