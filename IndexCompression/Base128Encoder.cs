@@ -10,19 +10,17 @@ public class Base128Encoder
     /// <summary>
     /// Encodes a list of uint data.
     /// </summary>
-    /// <param name="stream">Output stream used to capture encoded bytes.</param>
     /// <param name="data">The data to encode.</param>
-    /// <returns>Length of the encoded data stream.</returns>
     public byte[] EncodeList(List<uint> data)
     {
         if (data.Count == 0) return new byte[0];
 
-        using (var encodingStream = new MemoryStream())
+        using (var encodingStream = new MemoryStream((data.Count * sizeof(uint) / 2)))
         {
-            data = createDGapList(data);
-            for (int i = 0; i < data.Count; i++)
+            var dgl = createGapList(data);
+            for (int i = 0; i < dgl.Count; i++)
             {
-                Encode(encodingStream, data[i]);
+                Encode(encodingStream, dgl[i]);
             }
             return encodingStream.ToArray();
         }
@@ -31,7 +29,7 @@ public class Base128Encoder
     /// <summary>
     /// Decodes a list of uint data from the provided stream.
     /// </summary>
-    /// <param name="stream">Stream containing encoded data bytes.</param>
+    /// <param name="compressedData">The packed data bytes.</param>
     /// <returns>Decoded data set.</returns>
     public List<uint> DecodeList(byte[] compressedData)
     {
@@ -127,15 +125,17 @@ public class Base128Encoder
         return true;
     }
 
+    static List<uint> _dgt = new List<uint>(0xfffff); // ~ 1 million, 2.5 bytes
+
     /// <summary>
     /// Creates a d-gap list from source data.
     /// </summary>
     /// <param name="data">Source data list.</param>
     /// <returns>D-gap list based on original data.</returns>
-    private List<uint> createDGapList(List<uint> data)
+    private List<uint> createGapList(List<uint> data)
     {
         // sort input data
-        var dg = new List<uint>();
+        _dgt.Clear();
         data.Sort();
 
         // create d-gap list
@@ -145,14 +145,14 @@ public class Base128Encoder
             var v = data[i];
             if (counter > 0)
             {
-                dg.Add(v - data[counter - 1]);
+                _dgt.Add(v - data[counter - 1]);
             }
             else
             {
-                dg.Add(v);
+                _dgt.Add(v);
             }
             counter++;
         }
-        return dg;
+        return _dgt;
     }
 }

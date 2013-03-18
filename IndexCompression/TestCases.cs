@@ -1,9 +1,8 @@
-﻿using IndexCompression;
-using System;
-using System.Collections.Concurrent;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using IndexCompression;
 
 static class TestCases
 {
@@ -18,39 +17,52 @@ static class TestCases
     {
         // simple test runner
         var sw = new Stopwatch();
-        var runTest = new Action<string, Action>((name, test) =>
+
+        var runTest = new Action<string, Action<TestContext>>((name, test) =>
         {
+            var context = new TestContext();
+            var oldColor = Console.ForegroundColor;
             Console.Write("{0} -> ", name);
             try
             {
                 sw.Start();
-                test();
+                test(context);
+                Console.ForegroundColor = ConsoleColor.Green;
                 Console.Write("PASSED ");
             }
             catch (Exception e)
             {
+                Console.ForegroundColor = ConsoleColor.Red;
                 Console.Write("FAILED ");
-                Console.WriteLine(e);
+                Console.Write(e.Message);
             }
             finally
             {
                 sw.Stop();
-                Console.WriteLine("[{0} ms]", sw.ElapsedMilliseconds);
+                Console.WriteLine(" [{0} ms]", sw.ElapsedMilliseconds);
+                Console.ForegroundColor = oldColor;
+
+                if (context.HasOutput)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine(context.GetContextOutput());
+                }
                 sw.Reset();
             }
         });
 
         // tests to run
-        runTest("VerifyEncodeDecodeList", ListEncodesAndDecodes);
-        runTest("CanLocateKnownData", CanLocateKnownData);
-        runTest("CanStoreMultiValueData", CanStoreMultiValueData);
-        //runTest("LoadTestScenario", LoadTestScenario);
+        //runTest("VerifyEncodeDecodeList", ListEncodesAndDecodes);
+        //runTest("CompressionYieldsLessStorage", CompressionYieldsLessStorage);
+        //runTest("CanLocateKnownData", CanLocateKnownData);
+        //runTest("CanStoreMultiValueData", CanStoreMultiValueData);
+        runTest("LoadTestScenario", LoadTestScenario);
     }
 
     /// <summary>
     /// Make sure we can get a list back in the same forms.
     /// </summary>
-    static void ListEncodesAndDecodes()
+    static void ListEncodesAndDecodes(TestContext context)
     {
         var rawList = new List<uint>();
 
@@ -74,9 +86,34 @@ static class TestCases
     }
 
     /// <summary>
+    /// Just a check to see how much space we're saving
+    /// </summary>
+    static void CompressionYieldsLessStorage(TestContext context)
+    {
+        // create a list of 500,000 uints
+        // at 4bytes per uint, this should be ~1.9 - 2.0 MB
+        var TEST_SIZE = 2000000;
+        var docIds = new List<UInt32>(TEST_SIZE);
+        var rng = new Random();
+
+        for (var j = 0; j < TEST_SIZE; j++)
+        {
+            docIds.Add((uint)rng.Next(1, Int32.MaxValue));
+        }
+
+        // now compress that list
+        var encoder = new Base128Encoder();
+        var packedData = encoder.EncodeList(docIds);
+
+        // How much space did we save
+        context.WriteLine(String.Format("Raw size: {0} bytes", TEST_SIZE * 4));
+        context.WriteLine(String.Format("Packed size: {0} bytes", packedData.Length));
+    }
+
+    /// <summary>
     /// Make sure we find exactly the known data we're after
     /// </summary>
-    static void CanLocateKnownData()
+    static void CanLocateKnownData(TestContext context)
     {
         var index = new Dictionary<string, byte[]>();
         var encoder = new Base128Encoder();
@@ -140,7 +177,7 @@ static class TestCases
     ///     d0 : 17
     ///     
     /// </summary>
-    static void CanStoreMultiValueData()
+    static void CanStoreMultiValueData(TestContext context)
     {
         // index stuffs
         var termHashMap = new Dictionary<uint, TermValuePair>();
@@ -256,12 +293,12 @@ static class TestCases
     /// <summary>
     /// Original load-test scenario.
     /// </summary>
-    static void LoadTestScenario()
+    static void LoadTestScenario(TestContext context)
     {
         // Test config
-        var TERMS = 10000;
-        var DOCS_PER_TERM = 1000;
-        var TOTAL_DOCS = 10000;
+        var TERMS = 50000;
+        var DOCS_PER_TERM = 10000;
+        var TOTAL_DOCS = 100000;
 
         // test support
         var sw = new Stopwatch();
@@ -270,7 +307,7 @@ static class TestCases
         // Our simple inverted index and an encoder
         // Note the index does not map term to list-of-docid...
         // Instead, it maps term to compressed range.
-        var index = new ConcurrentDictionary<string, byte[]>();
+        var index = new Dictionary<string, byte[]>();
         var encoder = new Base128Encoder();
 
         ////////////////////////////////////////////////////////
@@ -296,6 +333,9 @@ static class TestCases
         //
         // Search index data
         //
+
+        Console.WriteLine("Ready:");
+        Console.ReadLine();
 
         // Let's search for 'terms' that begin with '5000'
         // We then want all docs that are in both terms
@@ -331,6 +371,7 @@ static class TestCases
         //
 
         sw.Stop();
-        //Console.WriteLine("\t\tQuery finished: {0}ms", sw.ElapsedMilliseconds);
+        context.WriteLine(string.Format("Found {0} results", outSet.Count));
+        context.WriteLine(string.Format("Query time: {0}ms", sw.ElapsedMilliseconds));
     }
 }
