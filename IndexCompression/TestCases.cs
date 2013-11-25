@@ -57,7 +57,7 @@ static class TestCases
         //runTest("CanLocateKnownData", CanLocateKnownData);
         //runTest("CanStoreMultiValueData", CanStoreMultiValueData);
         runTest("LoadTestVarintDecoding", LoadTestVarintDecoding);
-        runTest("LoadTestScenario", LoadTestScenario);
+        //runTest("LoadTestScenario", LoadTestScenario);
     }
 
     /// <summary>
@@ -67,7 +67,7 @@ static class TestCases
     {
         var rawList = new List<uint>();
 
-        for (var j = 0; j < 10; j++)
+        for (var j = 0; j < 100; j++)
         {
             rawList.Add((uint)j);
         }
@@ -91,8 +91,8 @@ static class TestCases
     /// </summary>
     static void CompressionYieldsLessStorage(TestContext context)
     {
-        // create a list of 500,000 uints
-        // at 4bytes per uint, this should be ~1.9 - 2.0 MB
+        // create a list of 2,000,000 uints
+        // at 4bytes per uint, this should be ~7.8 - 8.0 MB
         var TEST_SIZE = 2000000;
         var docIds = new List<UInt32>(TEST_SIZE);
         var rng = new Random();

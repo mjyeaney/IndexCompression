@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Express 2012 for Web
+# Visual Studio 2012
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IndexCompression", "IndexCompression\IndexCompression.csproj", "{3406D5D4-D6B9-4FAD-9CD5-81DE311B01CF}"
 EndProject
 Global
