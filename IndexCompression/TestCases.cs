@@ -56,6 +56,7 @@ static class TestCases
         //runTest("CompressionYieldsLessStorage", CompressionYieldsLessStorage);
         //runTest("CanLocateKnownData", CanLocateKnownData);
         //runTest("CanStoreMultiValueData", CanStoreMultiValueData);
+        runTest("LoadTestVarintDecoding", LoadTestVarintDecoding);
         runTest("LoadTestScenario", LoadTestScenario);
     }
 
@@ -291,9 +292,9 @@ static class TestCases
     }
 
     /// <summary>
-    /// Original load-test scenario.
+    /// Tests the varint decoding performance.
     /// </summary>
-    static void LoadTestScenario(TestContext context)
+    static void LoadTestVarintDecoding(TestContext context)
     {
         // Test config
         var TERMS = 50000;
@@ -314,6 +315,7 @@ static class TestCases
         //
         // Create index data
         //
+
         for (var j = 0; j < TERMS; j++)
         {
             var docLinks = new List<uint>();
@@ -321,7 +323,7 @@ static class TestCases
             // add document links
             for (var m = 0; m < DOCS_PER_TERM; m++)
             {
-                docLinks.Add((uint)rng.Next(1, TOTAL_DOCS)); // assume our doc count is 10K
+                docLinks.Add((uint)rng.Next(1, TOTAL_DOCS));
             }
 
             // compress the docID list
@@ -334,8 +336,69 @@ static class TestCases
         // Search index data
         //
 
-        Console.WriteLine("Ready:");
-        Console.ReadLine();
+        var decodeCount = 0;
+        sw.Start();
+
+        // how about just a simple linear scan for now
+        foreach (var termPair in index)
+        {
+            var decodedList = encoder.DecodeList(termPair.Value);
+            decodeCount += decodedList.Count;
+        }
+
+        ////////////////////////////////////////////////////////
+        //
+        // Results summary
+        //
+
+        sw.Stop();
+        context.WriteLine(string.Format("Decoded {0} keys in {1} ms", decodeCount, sw.ElapsedMilliseconds));
+    }
+
+    /// <summary>
+    /// Tests a decode / set-operation scenario
+    /// </summary>
+    static void LoadTestScenario(TestContext context)
+    {
+        // Test config
+        var TERMS = 50000;
+        var DOCS_PER_TERM = 10000;
+        var TOTAL_DOCS = 100000;        
+
+        // test support
+        var sw = new Stopwatch();
+        var rng = new Random();
+
+        // Our simple inverted index and an encoder
+        // Note the index does not map term to list-of-docid...
+        // Instead, it maps term to compressed range.
+        var index = new Dictionary<string, byte[]>();
+        var encoder = new Base128Encoder();
+
+        ////////////////////////////////////////////////////////
+        //
+        // Create index data
+        //
+
+        for (var j = 0; j < TERMS; j++)
+        {
+            var docLinks = new List<uint>();
+
+            // add document links
+            for (var m = 0; m < DOCS_PER_TERM; m++)
+            {
+                docLinks.Add((uint)rng.Next(1, TOTAL_DOCS));
+            }
+
+            // compress the docID list
+            // We'll just use 'j' in string form as our term
+            index[j.ToString()] = encoder.EncodeList(docLinks);
+        }
+
+        ////////////////////////////////////////////////////////
+        //
+        // Search index data
+        //
 
         // Let's search for 'terms' that begin with '5000'
         // We then want all docs that are in both terms
